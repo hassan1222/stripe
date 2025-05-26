@@ -30,7 +30,13 @@ jobs:
         ssh ${{ secrets.DEPLOY_SERVER }} << 'EOF'
           cd ${{ secrets.DEPLOY_PATH }}/server
           npm install
-          pm2 restart all || pm2 start server.js --name my-server
+          
+          # Set production environment
+          export NODE_ENV=production
+          
+          # Restart the server with PM2
+          pm2 delete my-server || true
+          pm2 start server.js --name my-server
           
           cd ../client
           npm install
@@ -51,4 +57,10 @@ jobs:
           # Set proper permissions
           sudo chown -R www-data:www-data /var/www/html
           sudo chmod -R 755 /var/www/html
+          
+          # Configure firewall to allow traffic on port 5000
+          sudo ufw allow 5000/tcp
+          
+          # Restart nginx if it's installed
+          sudo systemctl restart nginx || true
         EOF

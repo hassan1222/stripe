@@ -9,7 +9,6 @@ dotenv.config();
 
 const Stripe = require('stripe');
 
-
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 
 // Route imports
@@ -17,14 +16,12 @@ const authRoutes = require('./routes/authRoutes');
 const googleAuthRoutes = require('./routes/googleAuthRoutes');
 const productRoutes = require('./routes/productRoutes');
 
-// Load environment variables
-
 // Create Express app
 const app = express();
 
 // Middleware
 app.use(cors({
-  origin: 'http://localhost:3000',
+  origin: ['http://localhost:3000', 'http://178.128.155.240'],
   credentials: true
 }));
 app.use(express.json());
@@ -86,8 +83,12 @@ app.post('/create-checkout-session', async (req, res) => {
       payment_method_types: ['card'],
       line_items,
       mode: 'payment',
-      success_url: 'http://localhost:3000/success',
-      cancel_url: 'http://localhost:3000/cancel',
+      success_url: process.env.NODE_ENV === 'production' 
+        ? 'http://178.128.155.240/success'
+        : 'http://localhost:3000/success',
+      cancel_url: process.env.NODE_ENV === 'production'
+        ? 'http://178.128.155.240/cancel'
+        : 'http://localhost:3000/cancel',
     });
 
     res.json({ id: session.id });
@@ -97,9 +98,8 @@ app.post('/create-checkout-session', async (req, res) => {
   }
 });
 
-
 // Start Server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
 });
