@@ -30,7 +30,7 @@ jobs:
         ssh ${{ secrets.DEPLOY_SERVER }} << 'EOF'
           cd ${{ secrets.DEPLOY_PATH }}/server
           npm install
-          pm2 restart all || pm2 start index.js --name my-server
+          pm2 restart all || pm2 start server.js --name my-server
           
           cd ../client
           npm install
