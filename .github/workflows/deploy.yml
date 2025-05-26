@@ -35,5 +35,20 @@ jobs:
           cd ../client
           npm install
           npm run build
-          cp -r build/* /var/www/html/
+          
+          # Check if build directory exists
+          if [ ! -d "build" ]; then
+            echo "Error: build directory not found"
+            exit 1
+          fi
+          
+          # Create /var/www/html if it doesn't exist
+          sudo mkdir -p /var/www/html
+          
+          # Copy build files
+          sudo cp -r build/* /var/www/html/
+          
+          # Set proper permissions
+          sudo chown -R www-data:www-data /var/www/html
+          sudo chmod -R 755 /var/www/html
         EOF
