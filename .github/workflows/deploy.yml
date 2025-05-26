@@ -35,5 +35,5 @@ jobs:
           cd ../client
           npm install
           npm run build
-          cp -r dist/* /var/www/html/
+          cp -r build/* /var/www/html/
         EOF
