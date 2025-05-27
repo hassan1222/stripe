@@ -29,6 +29,16 @@ jobs:
       run: |
         ssh ${{ secrets.DEPLOY_SERVER }} << 'EOF'
           cd ${{ secrets.DEPLOY_PATH }}/server
+          
+          # Create server .env file
+          cat > .env << 'EOL'
+          MONGODB_URI=${{ secrets.MONGODB_URI }}
+          STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
+          SESSION_SECRET=${{ secrets.SESSION_SECRET }}
+          NODE_ENV=production
+          PORT=5000
+          EOL
+          
           npm install
           
           # Set production environment
@@ -39,6 +49,12 @@ jobs:
           pm2 start server.js --name my-server
           
           cd ../client
+          
+          # Create client .env file
+          cat > .env << 'EOL'
+          REACT_APP_API_URL=http://178.128.155.240:5000/api/auth
+          EOL
+          
           npm install
           npm run build
           
