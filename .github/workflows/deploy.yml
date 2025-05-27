@@ -42,20 +42,35 @@ jobs:
           EOL
           
           # Clean install dependencies
+          echo "Cleaning up old dependencies..."
           rm -rf node_modules package-lock.json
-          npm cache clean --force
-          npm install --production
           
-          # Verify node_modules exists
+          echo "Clearing npm cache..."
+          npm cache clean --force
+          
+          echo "Installing dependencies..."
+          npm install
+          
+          # Verify node_modules exists and express is installed
           if [ ! -d "node_modules" ]; then
             echo "Error: node_modules directory not found after installation"
             exit 1
           fi
           
+          if [ ! -d "node_modules/express" ]; then
+            echo "Error: express module not found in node_modules"
+            exit 1
+          fi
+          
+          # List installed modules for debugging
+          echo "Installed modules:"
+          ls -la node_modules
+          
           # Set production environment
           export NODE_ENV=production
           
           # Restart the server with PM2
+          echo "Restarting server..."
           pm2 delete my-server || true
           pm2 start server.js --name my-server
           
@@ -68,6 +83,7 @@ jobs:
           EOL
           
           # Clean install client dependencies
+          echo "Installing client dependencies..."
           rm -rf node_modules package-lock.json
           npm cache clean --force
           npm install
@@ -91,7 +107,9 @@ jobs:
           # Restart nginx
           sudo systemctl restart nginx || true
           
-          # Check server status
+          # Check server status and logs
+          echo "Checking server status..."
           pm2 status
+          echo "Server logs:"
           pm2 logs my-server --lines 20
         EOF
