@@ -25,12 +25,13 @@ jobs:
         EOF
         rsync -avz --delete ./ ${{ secrets.DEPLOY_SERVER }}:${{ secrets.DEPLOY_PATH }}
 
-    - name: Restart server on droplet
+    - name: Deploy and configure applications
       run: |
         ssh ${{ secrets.DEPLOY_SERVER }} << 'EOF'
+          # Server deployment
           cd ${{ secrets.DEPLOY_PATH }}/server
           
-          # Create server .env file
+          # Create server .env file with all required variables
           cat > .env << 'EOL'
           MONGODB_URI=${{ secrets.MONGODB_URI }}
           STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
@@ -40,43 +41,36 @@ jobs:
           EOL
           
           npm install
-          
-          # Set production environment
           export NODE_ENV=production
-          
-          # Restart the server with PM2
           pm2 delete my-server || true
           pm2 start server.js --name my-server
           
+          # Client deployment
           cd ../client
           
-          # Create client .env file
+          # Create client .env file with all required variables
           cat > .env << 'EOL'
-          REACT_APP_API_URL=http://178.128.155.240:5000/api/auth
+          REACT_APP_API_URL=${{ secrets.REACT_APP_API_URL }}
           EOL
           
           npm install
           npm run build
           
-          # Check if build directory exists
+          # Verify build directory
           if [ ! -d "build" ]; then
             echo "Error: build directory not found"
             exit 1
           fi
           
-          # Create /var/www/html if it doesn't exist
+          # Setup web server directory
           sudo mkdir -p /var/www/html
-          
-          # Copy build files
           sudo cp -r build/* /var/www/html/
-          
-          # Set proper permissions
           sudo chown -R www-data:www-data /var/www/html
           sudo chmod -R 755 /var/www/html
           
-          # Configure firewall to allow traffic on port 5000
+          # Configure firewall
           sudo ufw allow 5000/tcp
           
-          # Restart nginx if it's installed
+          # Restart nginx
           sudo systemctl restart nginx || true
         EOF
