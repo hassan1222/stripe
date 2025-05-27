@@ -36,6 +36,7 @@ jobs:
           MONGODB_URI=${{ secrets.MONGODB_URI }}
           STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
           SESSION_SECRET=${{ secrets.SESSION_SECRET }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
           NODE_ENV=production
           PORT=5000
           EOL
