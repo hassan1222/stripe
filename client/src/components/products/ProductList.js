@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, ArrowRight, Loader2, ShoppingCart } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 
+const API_BASE_URL = process.env.REACT_APP_PRODUCTS_API_URL || 'http://localhost:5000/api/products';
+const UPLOADS_URL = process.env.REACT_APP_UPLOADS_URL || 'http://localhost:5000/uploads';
+
 const ProductList = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -18,10 +21,9 @@ const ProductList = () => {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      // Get token from localStorage
       const token = localStorage.getItem('token');
       
-      const response = await fetch(`http://localhost:5000/api/products?page=${currentPage}&limit=6`, {
+      const response = await fetch(`${API_BASE_URL}?page=${currentPage}&limit=6`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -96,9 +98,8 @@ const ProductList = () => {
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {products.map(product => {
-          // Calculate image URL
           const imageName = product.imageUrl.split('\\').pop().split('/').pop();
-          const imageUrl = `http://localhost:5000/uploads/${imageName}`;
+          const imageUrl = `${UPLOADS_URL}/${imageName}`;
           
           return (
             <div key={product._id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300">

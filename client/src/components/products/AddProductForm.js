@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
+const API_BASE_URL = process.env.REACT_APP_PRODUCTS_API_URL || 'http://localhost:5000/api/products';
+
 const AddProductForm = ({ onClose }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -67,18 +69,15 @@ const AddProductForm = ({ onClose }) => {
       setLoading(true);
       setError(null);
       
-      // Get token from localStorage
       const token = localStorage.getItem('token');
       
-      // Create form data
       const formData = new FormData();
       formData.append('title', title);
       formData.append('description', description);
       formData.append('price', price);
       formData.append('image', image);
       
-      // Submit to API
-      const response = await axios.post('http://localhost:5000/api/products', formData, {
+      const response = await axios.post(API_BASE_URL, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
           Authorization: `Bearer ${token}`
