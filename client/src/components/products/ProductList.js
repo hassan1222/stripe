@@ -2,8 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, ArrowRight, Loader2, ShoppingCart } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 
-const API_BASE_URL = process.env.REACT_APP_PRODUCTS_API_URL || 'http://localhost:5000/api/products';
-const UPLOADS_URL = process.env.REACT_APP_UPLOADS_URL || 'http://localhost:5000/uploads';
+const isDevelopment = window.location.hostname === 'localhost';
+const API_BASE_URL = isDevelopment 
+  ? 'http://localhost:5000/api/products'
+  : 'http://178.128.155.240:5000/api/products';
+const UPLOADS_URL = isDevelopment 
+  ? 'http://localhost:5000/uploads'
+  : 'http://178.128.155.240:5000/uploads';
 
 const ProductList = () => {
   const [products, setProducts] = useState([]);

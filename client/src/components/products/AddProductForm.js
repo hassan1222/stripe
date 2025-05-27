@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_PRODUCTS_API_URL || 'http://localhost:5000/api/products';
+const isDevelopment = window.location.hostname === 'localhost';
+const API_BASE_URL = isDevelopment 
+  ? 'http://localhost:5000/api/products'
+  : 'http://178.128.155.240:5000/api/products';
 
 const AddProductForm = ({ onClose }) => {
   const [title, setTitle] = useState('');

@@ -18,9 +18,7 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['http://178.128.155.240', 'https://178.128.155.240']
-    : ['http://localhost:3000'],
+  origin: ['http://localhost:3000', 'http://178.128.155.240', 'https://178.128.155.240'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
