@@ -4,16 +4,13 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
 const session = require('express-session');
-const passport = require('./middlewares/googleAuthMiddleware');
 dotenv.config();
 
 const Stripe = require('stripe');
-
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 
 // Route imports
 const authRoutes = require('./routes/authRoutes');
-const googleAuthRoutes = require('./routes/googleAuthRoutes');
 const productRoutes = require('./routes/productRoutes');
 
 // Create Express app
@@ -31,7 +28,7 @@ app.use(cors({
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Session middleware for Passport
+// Session middleware
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-secret-key',
   resave: false,
@@ -41,10 +38,6 @@ app.use(session({
     maxAge: 24 * 60 * 60 * 1000 // 1 day
   }
 }));
-
-// Initialize Passport
-app.use(passport.initialize());
-app.use(passport.session());
 
 // Database Connection
 mongoose.connect(process.env.MONGODB_URI, {
@@ -56,7 +49,6 @@ mongoose.connect(process.env.MONGODB_URI, {
 
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/auth', googleAuthRoutes);  // Mount Google Auth routes
 app.use('/api/products', productRoutes);
 
 // Error Handling Middleware
