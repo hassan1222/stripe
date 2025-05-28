@@ -93,3 +93,4 @@ jobs:
         sleep 30  # Wait for containers to start
         curl -f http://159.223.118.251 || exit 1
         echo "Deployment successful!"
+        
