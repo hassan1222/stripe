@@ -3,6 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
+// Use environment variable for API base URL
+const API_BASE_URL = process.env.REACT_APP_API_URL;
+
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -27,9 +30,8 @@ const LoginPage = () => {
     const token = queryParams.get('token');
     
     if (token) {
-      // Store the token in localStorage
       localStorage.setItem('token', token);
-      window.location.href = '/profile'; // Redirect to profile page
+      window.location.href = '/profile';
     }
   }, []);
 
@@ -43,7 +45,7 @@ const LoginPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setFormError('');
-    
+
     if (!email || !password) {
       setFormError('Please enter both email and password');
       return;
@@ -52,7 +54,7 @@ const LoginPage = () => {
     try {
       setIsSubmitting(true);
       await login(email, password);
-      // Navigation is handled by the useEffect above
+      // Redirect handled in useEffect
     } catch (err) {
       setFormError(err.response?.data?.message || 'Login failed. Please try again.');
     } finally {
@@ -61,7 +63,7 @@ const LoginPage = () => {
   };
 
   const handleGoogleLogin = () => {
-    window.location.href = 'http://localhost:5000/api/auth/google';
+    window.location.href = `${API_BASE_URL}/google`;
   };
 
   return (
