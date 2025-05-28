@@ -18,169 +18,149 @@ jobs:
       with:
         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-    - name: Debug - Show local files
+    - name: Debug - Show frontend changes
       run: |
-        echo "=== Local files being deployed ==="
-        ls -la
-        echo "=== Git status ==="
-        git status
-        echo "=== Latest commit ==="
-        git log -1 --oneline
+        echo "=== Frontend files being deployed ==="
+        ls -la client/
+        echo "=== Recent commits ==="
+        git log -3 --oneline
+        echo "=== Changed files in last commit ==="
+        git diff --name-only HEAD~1 HEAD
 
     - name: Copy files to droplet
       run: |
-        echo "=== Creating deployment directory ==="
         ssh -o StrictHostKeyChecking=no ${{ secrets.DEPLOY_SERVER }} << 'EOF'
           mkdir -p ${{ secrets.DEPLOY_PATH }}
         EOF
         
-        echo "=== Syncing files ==="
+        echo "=== Syncing ALL files with verbose output ==="
         rsync -avz --delete --progress ./ ${{ secrets.DEPLOY_SERVER }}:${{ secrets.DEPLOY_PATH }}
-        
-        echo "=== Verifying files copied ==="
-        ssh ${{ secrets.DEPLOY_SERVER }} << 'EOF'
-          echo "Files in deployment directory:"
-          ls -la ${{ secrets.DEPLOY_PATH }}
-          echo "Latest git commit on server:"
-          cd ${{ secrets.DEPLOY_PATH }}
-          git log -1 --oneline || echo "No git history found"
-        EOF
 
-    - name: Deploy and configure applications
+    - name: Deploy Frontend (Focus)
       run: |
         ssh ${{ secrets.DEPLOY_SERVER }} << 'EOF'
-          set -e  # Exit on any error
+          set -e
           
-          echo "=== Starting deployment process ==="
-          echo "Current time: $(date)"
+          echo "=== FRONTEND DEPLOYMENT START ==="
+          echo "Timestamp: $(date)"
           
-          # Server deployment
-          cd ${{ secrets.DEPLOY_PATH }}/server
+          cd ${{ secrets.DEPLOY_PATH }}/client
           
-          echo "=== Server directory contents ==="
+          echo "=== Client directory after sync ==="
           ls -la
           
-          # Create server .env file with all required variables
-          cat > .env << 'EOL'
-          MONGODB_URI=${{ secrets.MONGODB_URI }}
-          STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
-          SESSION_SECRET=${{ secrets.SESSION_SECRET }}
-          JWT_SECRET=${{ secrets.JWT_SECRET }}
-          NODE_ENV=production
-          PORT=5000
-          EOL
-          
-          echo "=== Server .env created ==="
-          
-          # Clean install dependencies
-          echo "Cleaning up old dependencies..."
-          rm -rf node_modules package-lock.json
-          
-          echo "Clearing npm cache..."
-          npm cache clean --force
-          
-          echo "Installing dependencies..."
-          npm install --production
-          
-          # Verify critical dependencies
-          if [ ! -d "node_modules" ]; then
-            echo "Error: node_modules directory not found after installation"
+          echo "=== Checking for package.json ==="
+          if [ ! -f "package.json" ]; then
+            echo "ERROR: package.json not found in client directory!"
             exit 1
           fi
           
-          if [ ! -d "node_modules/express" ]; then
-            echo "Error: express module not found in node_modules"
-            npm list express || echo "Express not in package list"
-            exit 1
-          fi
-          
-          echo "=== Dependencies installed successfully ==="
-          
-          # Stop existing server first
-          echo "Stopping existing server..."
-          pm2 stop my-server || echo "Server was not running"
-          pm2 delete my-server || echo "Server process not found"
-          
-          # Set production environment
-          export NODE_ENV=production
-          
-          # Start the server with PM2
-          echo "Starting server..."
-          pm2 start server.js --name my-server --env production
-          
-          # Wait a moment for server to start
-          sleep 3
-          
-          echo "=== Server Status ==="
-          pm2 status
-          pm2 logs my-server --lines 10
-          
-          # Test server is responding
-          echo "=== Testing server response ==="
-          curl -f http://localhost:5000/api/health || echo "Health check failed - server may not be ready"
-          
-          # Client deployment
-          cd ../client
-          
-          echo "=== Client directory contents ==="
-          ls -la
+          cat package.json | grep -A 5 -B 5 "scripts" || echo "No scripts section found"
           
           # Create client .env file
+          echo "=== Creating .env file ==="
           cat > .env << 'EOL'
           REACT_APP_API_URL=http://178.128.155.240:5000/api/auth
           EOL
           
-          echo "=== Client .env created ==="
+          echo "=== .env file created ==="
+          cat .env
           
-          # Clean install client dependencies
-          echo "Installing client dependencies..."
-          rm -rf node_modules package-lock.json build
+          # COMPLETE clean slate for frontend
+          echo "=== Cleaning previous build completely ==="
+          rm -rf node_modules package-lock.json build .cache
+          
+          # Clear npm cache
           npm cache clean --force
+          
+          # Install dependencies
+          echo "=== Installing dependencies ==="
           npm install
           
-          echo "Building client..."
-          npm run build
+          echo "=== Installed packages ==="
+          npm list --depth=0 || echo "Package list unavailable"
           
-          # Verify build directory
+          # Build with verbose output
+          echo "=== Building React app ==="
+          npm run build -- --verbose
+          
+          # Verify build
           if [ ! -d "build" ]; then
-            echo "Error: build directory not found after build"
+            echo "ERROR: Build failed - no build directory created!"
             exit 1
           fi
           
           echo "=== Build directory contents ==="
           ls -la build/
+          echo "=== Build/static contents ==="
+          ls -la build/static/ || echo "No static directory"
           
-          # Backup existing web files
-          sudo cp -r /var/www/html /var/www/html.backup.$(date +%Y%m%d_%H%M%S) || echo "No existing files to backup"
+          # Check build size
+          echo "=== Build size ==="
+          du -sh build/
           
-          # Setup web server directory
-          sudo mkdir -p /var/www/html
+          # Create timestamped backup
+          BACKUP_DIR="/var/www/html.backup.$(date +%Y%m%d_%H%M%S)"
+          echo "=== Backing up current site to $BACKUP_DIR ==="
+          sudo cp -r /var/www/html $BACKUP_DIR || echo "No existing site to backup"
+          
+          # Deploy with force
+          echo "=== Deploying new build ==="
           sudo rm -rf /var/www/html/*
           sudo cp -r build/* /var/www/html/
           sudo chown -R www-data:www-data /var/www/html
           sudo chmod -R 755 /var/www/html
           
-          echo "=== Web files deployed ==="
-          ls -la /var/www/html/
+          echo "=== Deployed files ==="
+          sudo ls -la /var/www/html/
           
-          # Configure firewall
-          sudo ufw allow 5000/tcp || echo "Firewall rule already exists"
+          # Verify key files exist
+          echo "=== Verifying deployment ==="
+          if [ ! -f "/var/www/html/index.html" ]; then
+            echo "ERROR: index.html not found in deployed files!"
+            exit 1
+          fi
           
-          # Test nginx configuration
-          sudo nginx -t && echo "Nginx config valid" || echo "Nginx config invalid"
+          echo "=== index.html content preview ==="
+          sudo head -20 /var/www/html/index.html
           
-          # Restart nginx
+          # Test nginx config and restart
+          echo "=== Testing nginx config ==="
+          sudo nginx -t
+          
+          echo "=== Restarting nginx ==="
           sudo systemctl restart nginx
           sudo systemctl status nginx --no-pager -l
           
-          echo "=== Final Status Check ==="
-          pm2 status
-          echo "Server logs (last 20 lines):"
-          pm2 logs my-server --lines 20
+          # Final verification
+          echo "=== Testing deployment ==="
+          curl -I http://localhost || echo "Local test failed"
           
-          echo "=== Testing endpoints ==="
-          curl -I http://localhost || echo "Nginx not responding"
-          curl -I http://localhost:5000 || echo "Server not responding"
-          
-          echo "=== Deployment completed at $(date) ==="
+          echo "=== FRONTEND DEPLOYMENT COMPLETE ==="
+          echo "Timestamp: $(date)"
         EOF
+
+    - name: Quick Server Restart (if needed)
+      run: |
+        ssh ${{ secrets.DEPLOY_SERVER }} << 'EOF'
+          # Only restart server if it exists
+          if pm2 list | grep -q my-server; then
+            echo "=== Restarting server ==="
+            cd ${{ secrets.DEPLOY_PATH }}/server
+            pm2 restart my-server
+            pm2 status
+          else
+            echo "=== Server not running, skipping restart ==="
+          fi
+        EOF
+
+    - name: Test Deployment
+      run: |
+        echo "=== Testing deployed site ==="
+        sleep 5  # Wait for nginx to fully restart
+        curl -I http://178.128.155.240 || echo "Site not responding"
+        
+        # Test if it's actually serving new content
+        RESPONSE=$(curl -s http://178.128.155.240 | head -20)
+        echo "=== Site response preview ==="
+        echo "$RESPONSE"
