@@ -18,18 +18,47 @@ jobs:
       with:
         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
+    - name: Debug - Show local files
+      run: |
+        echo "=== Local files being deployed ==="
+        ls -la
+        echo "=== Git status ==="
+        git status
+        echo "=== Latest commit ==="
+        git log -1 --oneline
+
     - name: Copy files to droplet
       run: |
+        echo "=== Creating deployment directory ==="
         ssh -o StrictHostKeyChecking=no ${{ secrets.DEPLOY_SERVER }} << 'EOF'
           mkdir -p ${{ secrets.DEPLOY_PATH }}
         EOF
-        rsync -avz --delete ./ ${{ secrets.DEPLOY_SERVER }}:${{ secrets.DEPLOY_PATH }}
+        
+        echo "=== Syncing files ==="
+        rsync -avz --delete --progress ./ ${{ secrets.DEPLOY_SERVER }}:${{ secrets.DEPLOY_PATH }}
+        
+        echo "=== Verifying files copied ==="
+        ssh ${{ secrets.DEPLOY_SERVER }} << 'EOF'
+          echo "Files in deployment directory:"
+          ls -la ${{ secrets.DEPLOY_PATH }}
+          echo "Latest git commit on server:"
+          cd ${{ secrets.DEPLOY_PATH }}
+          git log -1 --oneline || echo "No git history found"
+        EOF
 
     - name: Deploy and configure applications
       run: |
         ssh ${{ secrets.DEPLOY_SERVER }} << 'EOF'
+          set -e  # Exit on any error
+          
+          echo "=== Starting deployment process ==="
+          echo "Current time: $(date)"
+          
           # Server deployment
           cd ${{ secrets.DEPLOY_PATH }}/server
+          
+          echo "=== Server directory contents ==="
+          ls -la
           
           # Create server .env file with all required variables
           cat > .env << 'EOL'
@@ -41,6 +70,8 @@ jobs:
           PORT=5000
           EOL
           
+          echo "=== Server .env created ==="
+          
           # Clean install dependencies
           echo "Cleaning up old dependencies..."
           rm -rf node_modules package-lock.json
@@ -49,9 +80,9 @@ jobs:
           npm cache clean --force
           
           echo "Installing dependencies..."
-          npm install
+          npm install --production
           
-          # Verify node_modules exists and express is installed
+          # Verify critical dependencies
           if [ ! -d "node_modules" ]; then
             echo "Error: node_modules directory not found after installation"
             exit 1
@@ -59,57 +90,97 @@ jobs:
           
           if [ ! -d "node_modules/express" ]; then
             echo "Error: express module not found in node_modules"
+            npm list express || echo "Express not in package list"
             exit 1
           fi
           
-          # List installed modules for debugging
-          echo "Installed modules:"
-          ls -la node_modules
+          echo "=== Dependencies installed successfully ==="
+          
+          # Stop existing server first
+          echo "Stopping existing server..."
+          pm2 stop my-server || echo "Server was not running"
+          pm2 delete my-server || echo "Server process not found"
           
           # Set production environment
           export NODE_ENV=production
           
-          # Restart the server with PM2
-          echo "Restarting server..."
-          pm2 delete my-server || true
-          pm2 start server.js --name my-server
+          # Start the server with PM2
+          echo "Starting server..."
+          pm2 start server.js --name my-server --env production
+          
+          # Wait a moment for server to start
+          sleep 3
+          
+          echo "=== Server Status ==="
+          pm2 status
+          pm2 logs my-server --lines 10
+          
+          # Test server is responding
+          echo "=== Testing server response ==="
+          curl -f http://localhost:5000/api/health || echo "Health check failed - server may not be ready"
           
           # Client deployment
           cd ../client
           
-          # Create client .env file with all required variables
+          echo "=== Client directory contents ==="
+          ls -la
+          
+          # Create client .env file
           cat > .env << 'EOL'
           REACT_APP_API_URL=http://178.128.155.240:5000/api/auth
           EOL
           
+          echo "=== Client .env created ==="
+          
           # Clean install client dependencies
           echo "Installing client dependencies..."
-          rm -rf node_modules package-lock.json
+          rm -rf node_modules package-lock.json build
           npm cache clean --force
           npm install
+          
+          echo "Building client..."
           npm run build
           
           # Verify build directory
           if [ ! -d "build" ]; then
-            echo "Error: build directory not found"
+            echo "Error: build directory not found after build"
             exit 1
           fi
           
+          echo "=== Build directory contents ==="
+          ls -la build/
+          
+          # Backup existing web files
+          sudo cp -r /var/www/html /var/www/html.backup.$(date +%Y%m%d_%H%M%S) || echo "No existing files to backup"
+          
           # Setup web server directory
           sudo mkdir -p /var/www/html
+          sudo rm -rf /var/www/html/*
           sudo cp -r build/* /var/www/html/
           sudo chown -R www-data:www-data /var/www/html
           sudo chmod -R 755 /var/www/html
           
+          echo "=== Web files deployed ==="
+          ls -la /var/www/html/
+          
           # Configure firewall
-          sudo ufw allow 5000/tcp
+          sudo ufw allow 5000/tcp || echo "Firewall rule already exists"
+          
+          # Test nginx configuration
+          sudo nginx -t && echo "Nginx config valid" || echo "Nginx config invalid"
           
           # Restart nginx
-          sudo systemctl restart nginx || true
+          sudo systemctl restart nginx
+          sudo systemctl status nginx --no-pager -l
           
-          # Check server status and logs
-          echo "Checking server status..."
+          echo "=== Final Status Check ==="
           pm2 status
-          echo "Server logs:"
+          echo "Server logs (last 20 lines):"
           pm2 logs my-server --lines 20
+          
+          echo "=== Testing endpoints ==="
+          curl -I http://localhost || echo "Nginx not responding"
+          curl -I http://localhost:5000 || echo "Server not responding"
+          
+          echo "=== Deployment completed at $(date) ==="
         EOF
