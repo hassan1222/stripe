@@ -22,10 +22,14 @@ jobs:
       run: |
         echo "=== Frontend files being deployed ==="
         ls -la client/
+        echo "=== Frontend src directory ==="
+        ls -la client/src/ || echo "No src directory found"
         echo "=== Recent commits ==="
         git log -3 --oneline
-        echo "=== Changed files in last commit ==="
-        git diff --name-only HEAD~1 HEAD
+        echo "=== All files in repository ==="
+        find . -name "*.js" -o -name "*.jsx" -o -name "*.ts" -o -name "*.tsx" | head -10
+        echo "=== Repository status ==="
+        git status --porcelain || echo "Clean working directory"
 
     - name: Copy files to droplet
       run: |
