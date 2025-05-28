@@ -1,9 +1,7 @@
-// src/pages/auth/LoginPage.js
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
-// Use environment variable for API base URL
 const API_BASE_URL = process.env.REACT_APP_API_URL;
 
 const LoginPage = () => {
@@ -16,7 +14,6 @@ const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Redirect to origin page or home if already logged in
   useEffect(() => {
     if (currentUser) {
       const from = location.state?.from?.pathname || '/profile';
@@ -24,7 +21,6 @@ const LoginPage = () => {
     }
   }, [currentUser, navigate, location]);
 
-  // Check for Google auth token in URL
   useEffect(() => {
     const queryParams = new URLSearchParams(window.location.search);
     const token = queryParams.get('token');
@@ -35,7 +31,6 @@ const LoginPage = () => {
     }
   }, []);
 
-  // Update form error when auth context error changes
   useEffect(() => {
     if (error) {
       setFormError(error);
@@ -54,7 +49,6 @@ const LoginPage = () => {
     try {
       setIsSubmitting(true);
       await login(email, password);
-      // Redirect handled in useEffect
     } catch (err) {
       setFormError(err.response?.data?.message || 'Login failed. Please try again.');
     } finally {
@@ -67,22 +61,23 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-form-container">
-        <h2>Login to Your Account</h2>
+    <div className="min-h-screen bg-gradient-to-br from-indigo-100 to-white flex items-center justify-center p-4">
+      <div className="w-full max-w-md bg-white shadow-lg rounded-2xl p-8">
+        <h2 className="text-2xl font-semibold text-center text-gray-800 mb-6">Login to Your Account</h2>
         
         {formError && (
-          <div className="alert alert-danger" role="alert">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded mb-4 text-sm">
             {formError}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="auth-form">
-          <div className="form-group">
-            <label htmlFor="email">Email</label>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email</label>
             <input
               type="email"
               id="email"
+              className="w-full px-4 py-2 mt-1 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Enter your email"
@@ -90,11 +85,12 @@ const LoginPage = () => {
             />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700">Password</label>
             <input
               type="password"
               id="password"
+              className="w-full px-4 py-2 mt-1 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter your password"
@@ -104,30 +100,31 @@ const LoginPage = () => {
 
           <button 
             type="submit" 
-            className="submit-button" 
+            className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition"
             disabled={isSubmitting}
           >
             {isSubmitting ? 'Logging in...' : 'Login'}
           </button>
         </form>
 
-        <div className="auth-divider">
-          <span>OR</span>
+        <div className="my-4 flex items-center">
+          <div className="flex-grow border-t border-gray-300" />
+          <span className="mx-4 text-gray-400 text-sm">OR</span>
+          <div className="flex-grow border-t border-gray-300" />
         </div>
 
         <button 
           onClick={handleGoogleLogin}
-          className="google-auth-button"
           type="button"
+          className="w-full py-2 px-4 flex items-center justify-center border border-gray-300 rounded-lg hover:bg-gray-100 transition"
         >
+          <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-5 h-5 mr-2" />
           Login with Google
         </button>
 
-        <div className="auth-redirect">
-          <p>
-            Don't have an account? <Link to="/signup">Sign up</Link>
-          </p>
-        </div>
+        <p className="text-sm text-center text-gray-600 mt-6">
+          Don't have an account? <Link to="/signup" className="text-indigo-600 hover:underline">Sign up</Link>
+        </p>
       </div>
     </div>
   );
