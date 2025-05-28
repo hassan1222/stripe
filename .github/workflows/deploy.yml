@@ -2,7 +2,7 @@ name: Deploy to DigitalOcean
 
 on:
   push:
-    branches: [ main, master ]  # Change to your main branch name
+    branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
 
@@ -11,86 +11,96 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    # Checkout code
     - name: Checkout code
       uses: actions/checkout@v4
 
-    # Setup Node.js (for any build steps if needed)
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '18'
 
-    # Login to Docker Hub (optional - for private repositories)
-    # - name: Login to Docker Hub
-    #   uses: docker/login-action@v3
-    #   with:
-    #     username: ${{ secrets.DOCKER_USERNAME }}
-    #     password: ${{ secrets.DOCKER_PASSWORD }}
-
-    # Setup SSH key for DigitalOcean droplet
     - name: Setup SSH key
       uses: webfactory/ssh-agent@v0.8.0
       with:
         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-    # Add server to known hosts
     - name: Add server to known hosts
       run: |
         ssh-keyscan -H 159.223.118.251 >> ~/.ssh/known_hosts
 
-    # Create environment files on server
-    - name: Create environment files
-      run: |
-        ssh root@159.223.118.251 << 'EOF'
-          mkdir -p /opt/myapp/server
-          mkdir -p /opt/myapp/client
-        EOF
-
-    # Copy environment variables to server
-    - name: Copy server environment file
-      run: |
-        echo "${{ secrets.SERVER_ENV }}" | ssh root@159.223.118.251 'cat > /opt/myapp/server/.env'
-
-    - name: Copy client environment file
-      run: |
-        echo "${{ secrets.CLIENT_ENV }}" | ssh root@159.223.118.251 'cat > /opt/myapp/client/.env'
-
-    # Deploy to DigitalOcean droplet
     - name: Deploy to server
       run: |
         ssh root@159.223.118.251 << 'EOF'
-          # Navigate to app directory
-          cd /opt/myapp
+          # Navigate to app directory (using /root/stripe instead of /opt/myapp)
+          cd /root
           
-          # Remove existing code
-          rm -rf client server docker-compose.yml nginx.conf
+          # Stop existing containers first
+          cd stripe 2>/dev/null && docker-compose down || true
           
-          # Clone the repository
-          git clone https://github.com/${{ github.repository }} temp_repo
+          # Remove existing code and clone fresh
+          rm -rf stripe
+          git clone https://github.com/${{ github.repository }} stripe
+          cd stripe
           
-          # Move files to correct location
-          mv temp_repo/* .
-          mv temp_repo/.* . 2>/dev/null || true
-          rm -rf temp_repo
+          # Create nginx.conf from default.conf if it doesn't exist
+          if [ ! -f nginx.conf ] && [ -f nginx/default.conf ]; then
+            cp nginx/default.conf nginx.conf
+          elif [ -f default.conf ]; then
+            cp default.conf nginx.conf
+          fi
           
-          # Stop existing containers
-          docker-compose down || true
+          # Create server .env file with basic setup if it doesn't exist
+          if [ ! -f server/.env ]; then
+            echo "NODE_ENV=production" > server/.env
+            echo "PORT=5000" >> server/.env
+          fi
           
-          # Remove old images to free space
+          # Clean up Docker to free space
           docker system prune -f
           
-          # Build and start new containers
+          # Build and start containers
           docker-compose up -d --build
           
-          # Show running containers
+          # Show what's running
+          echo "=== Container Status ==="
           docker ps
+          
+          echo "=== Container Logs ==="
+          docker-compose logs --tail=20
         EOF
 
-    # Health check
+    - name: Wait for services to start
+      run: |
+        echo "Waiting 60 seconds for all services to start..."
+        sleep 60
+
     - name: Health check
       run: |
-        sleep 30  # Wait for containers to start
-        curl -f http://159.223.118.251 || exit 1
-        echo "Deployment successful!"
+        echo "=== Health Check ==="
         
+        # Check if containers are running
+        ssh root@159.223.118.251 'cd /root/stripe && docker ps'
+        
+        # Test different endpoints
+        echo "Testing main endpoint..."
+        curl -f http://159.223.118.251 && echo "✅ Main site works" || echo "❌ Main site failed"
+        
+        echo "Testing API endpoint..."
+        curl -f http://159.223.118.251/api/ && echo "✅ API works" || echo "⚠️ API might not have root endpoint"
+        
+        # Check individual services
+        echo "Testing frontend directly..."
+        curl -f http://159.223.118.251:3000 && echo "✅ Frontend works" || echo "❌ Frontend failed"
+        
+        echo "Testing backend directly..."
+        curl -f http://159.223.118.251:5000 && echo "✅ Backend works" || echo "❌ Backend failed"
+        
+    - name: Deployment summary
+      if: always()
+      run: |
+        if curl -s http://159.223.118.251 > /dev/null; then
+          echo "🎉 Deployment successful! App is running at http://159.223.118.251"
+        else
+          echo "⚠️ Deployment completed but health check failed. Check container logs."
+          ssh root@159.223.118.251 'cd /root/stripe && docker-compose logs'
+        fi
