@@ -2,169 +2,94 @@ name: Deploy to DigitalOcean
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main, master ]  # Change to your main branch name
+  pull_request:
+    branches: [ main, master ]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
+    
     steps:
-    - name: Checkout repo
-      uses: actions/checkout@v3
+    # Checkout code
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-    - name: Setup SSH
-      uses: webfactory/ssh-agent@v0.7.0
+    # Setup Node.js (for any build steps if needed)
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    # Login to Docker Hub (optional - for private repositories)
+    # - name: Login to Docker Hub
+    #   uses: docker/login-action@v3
+    #   with:
+    #     username: ${{ secrets.DOCKER_USERNAME }}
+    #     password: ${{ secrets.DOCKER_PASSWORD }}
+
+    # Setup SSH key for DigitalOcean droplet
+    - name: Setup SSH key
+      uses: webfactory/ssh-agent@v0.8.0
       with:
         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-    - name: Debug - Show frontend changes
+    # Add server to known hosts
+    - name: Add server to known hosts
       run: |
-        echo "=== Frontend files being deployed ==="
-        ls -la client/
-        echo "=== Frontend src directory ==="
-        ls -la client/src/ || echo "No src directory found"
-        echo "=== Recent commits ==="
-        git log -3 --oneline
-        echo "=== All files in repository ==="
-        find . -name "*.js" -o -name "*.jsx" -o -name "*.ts" -o -name "*.tsx" | head -10
-        echo "=== Repository status ==="
-        git status --porcelain || echo "Clean working directory"
+        ssh-keyscan -H 159.223.118.251 >> ~/.ssh/known_hosts
 
-    - name: Copy files to droplet
+    # Create environment files on server
+    - name: Create environment files
       run: |
-        ssh -o StrictHostKeyChecking=no ${{ secrets.DEPLOY_SERVER }} << 'EOF'
-          mkdir -p ${{ secrets.DEPLOY_PATH }}
-        EOF
-        
-        echo "=== Syncing ALL files with verbose output ==="
-        rsync -avz --delete --progress ./ ${{ secrets.DEPLOY_SERVER }}:${{ secrets.DEPLOY_PATH }}
-
-    - name: Deploy Frontend (Focus)
-      run: |
-        ssh ${{ secrets.DEPLOY_SERVER }} << 'EOF'
-          set -e
-          
-          echo "=== FRONTEND DEPLOYMENT START ==="
-          echo "Timestamp: $(date)"
-          
-          cd ${{ secrets.DEPLOY_PATH }}/client
-          
-          echo "=== Client directory after sync ==="
-          ls -la
-          
-          echo "=== Checking for package.json ==="
-          if [ ! -f "package.json" ]; then
-            echo "ERROR: package.json not found in client directory!"
-            exit 1
-          fi
-          
-          cat package.json | grep -A 5 -B 5 "scripts" || echo "No scripts section found"
-          
-          # Create client .env file
-          echo "=== Creating .env file ==="
-          cat > .env << 'EOL'
-          REACT_APP_API_URL=http://178.128.155.240:5000/api/auth
-          EOL
-          
-          echo "=== .env file created ==="
-          cat .env
-          
-          # COMPLETE clean slate for frontend
-          echo "=== Cleaning previous build completely ==="
-          rm -rf node_modules package-lock.json build .cache
-          
-          # Clear npm cache
-          npm cache clean --force
-          
-          # Install dependencies
-          echo "=== Installing dependencies ==="
-          npm install
-          
-          echo "=== Installed packages ==="
-          npm list --depth=0 || echo "Package list unavailable"
-          
-          # Build with verbose output
-          echo "=== Building React app ==="
-          npm run build -- --verbose
-          
-          # Verify build
-          if [ ! -d "build" ]; then
-            echo "ERROR: Build failed - no build directory created!"
-            exit 1
-          fi
-          
-          echo "=== Build directory contents ==="
-          ls -la build/
-          echo "=== Build/static contents ==="
-          ls -la build/static/ || echo "No static directory"
-          
-          # Check build size
-          echo "=== Build size ==="
-          du -sh build/
-          
-          # Create timestamped backup
-          BACKUP_DIR="/var/www/html.backup.$(date +%Y%m%d_%H%M%S)"
-          echo "=== Backing up current site to $BACKUP_DIR ==="
-          sudo cp -r /var/www/html $BACKUP_DIR || echo "No existing site to backup"
-          
-          # Deploy with force
-          echo "=== Deploying new build ==="
-          sudo rm -rf /var/www/html/*
-          sudo cp -r build/* /var/www/html/
-          sudo chown -R www-data:www-data /var/www/html
-          sudo chmod -R 755 /var/www/html
-          
-          echo "=== Deployed files ==="
-          sudo ls -la /var/www/html/
-          
-          # Verify key files exist
-          echo "=== Verifying deployment ==="
-          if [ ! -f "/var/www/html/index.html" ]; then
-            echo "ERROR: index.html not found in deployed files!"
-            exit 1
-          fi
-          
-          echo "=== index.html content preview ==="
-          sudo head -20 /var/www/html/index.html
-          
-          # Test nginx config and restart
-          echo "=== Testing nginx config ==="
-          sudo nginx -t
-          
-          echo "=== Restarting nginx ==="
-          sudo systemctl restart nginx
-          sudo systemctl status nginx --no-pager -l
-          
-          # Final verification
-          echo "=== Testing deployment ==="
-          curl -I http://localhost || echo "Local test failed"
-          
-          echo "=== FRONTEND DEPLOYMENT COMPLETE ==="
-          echo "Timestamp: $(date)"
+        ssh root@159.223.118.251 << 'EOF'
+          mkdir -p /opt/myapp/server
+          mkdir -p /opt/myapp/client
         EOF
 
-    - name: Quick Server Restart (if needed)
+    # Copy environment variables to server
+    - name: Copy server environment file
       run: |
-        ssh ${{ secrets.DEPLOY_SERVER }} << 'EOF'
-          # Only restart server if it exists
-          if pm2 list | grep -q my-server; then
-            echo "=== Restarting server ==="
-            cd ${{ secrets.DEPLOY_PATH }}/server
-            pm2 restart my-server
-            pm2 status
-          else
-            echo "=== Server not running, skipping restart ==="
-          fi
+        echo "${{ secrets.SERVER_ENV }}" | ssh root@159.223.118.251 'cat > /opt/myapp/server/.env'
+
+    - name: Copy client environment file
+      run: |
+        echo "${{ secrets.CLIENT_ENV }}" | ssh root@159.223.118.251 'cat > /opt/myapp/client/.env'
+
+    # Deploy to DigitalOcean droplet
+    - name: Deploy to server
+      run: |
+        ssh root@159.223.118.251 << 'EOF'
+          # Navigate to app directory
+          cd /opt/myapp
+          
+          # Remove existing code
+          rm -rf client server docker-compose.yml nginx.conf
+          
+          # Clone the repository
+          git clone https://github.com/${{ github.repository }} temp_repo
+          
+          # Move files to correct location
+          mv temp_repo/* .
+          mv temp_repo/.* . 2>/dev/null || true
+          rm -rf temp_repo
+          
+          # Stop existing containers
+          docker-compose down || true
+          
+          # Remove old images to free space
+          docker system prune -f
+          
+          # Build and start new containers
+          docker-compose up -d --build
+          
+          # Show running containers
+          docker ps
         EOF
 
-    - name: Test Deployment
+    # Health check
+    - name: Health check
       run: |
-        echo "=== Testing deployed site ==="
-        sleep 5  # Wait for nginx to fully restart
-        curl -I http://178.128.155.240 || echo "Site not responding"
-        
-        # Test if it's actually serving new content
-        RESPONSE=$(curl -s http://178.128.155.240 | head -20)
-        echo "=== Site response preview ==="
-        echo "$RESPONSE"
+        sleep 30  # Wait for containers to start
+        curl -f http://159.223.118.251 || exit 1
+        echo "Deployment successful!"
