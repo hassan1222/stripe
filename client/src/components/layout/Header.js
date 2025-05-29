@@ -8,6 +8,8 @@ const Header = () => {
   const { currentUser, logout } = useAuth();
   const { cartItems, cartCount, removeFromCart } = useCart();
   const [showCart, setShowCart] = useState(false);
+  const UPLOADS_URL = process.env.REACT_APP_UPLOADS_URL || 'http://localhost:5000/uploads';
+
 
   const toggleCart = () => {
     setShowCart(!showCart);
@@ -130,7 +132,7 @@ const Header = () => {
                                   className="w-full h-full object-cover"
                                   onError={(e) => {
                                     e.target.onerror = null;
-                                    e.target.src = '/placeholder-image.jpg';
+                                    e.target.src = `${UPLOADS_URL}/placeholder-image.jpg`;
                                   }}
                                 />
                               )}

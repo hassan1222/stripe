@@ -111,7 +111,7 @@ const ProductList = () => {
                   onError={(e) => {
                     console.error(`Failed to load image: ${imageUrl}`);
                     e.target.onerror = null;
-                    e.target.src = '/placeholder-image.jpg';
+                    e.target.src = `${UPLOADS_URL}/placeholder-image.jpg`;
                   }}
                 />
               </div>

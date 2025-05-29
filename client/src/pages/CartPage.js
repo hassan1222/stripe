@@ -7,7 +7,8 @@ import { loadStripe } from '@stripe/stripe-js';
 const CartPage = () => {
   const { cartItems, removeFromCart, updateQuantity, clearCart } = useCart();
   const [isLoading, setIsLoading] = useState(false);
-  
+  const UPLOADS_URL = process.env.REACT_APP_UPLOADS_URL || 'http://localhost:5000/uploads';
+
   const calculateItemTotal = (item) => {
     return (item.price * item.quantity).toFixed(2);
   };
@@ -119,7 +120,7 @@ const CartPage = () => {
                         className="w-full h-full object-cover"
                         onError={(e) => {
                           e.target.onerror = null;
-                          e.target.src = '/placeholder-image.jpg';
+                          e.target.src = `${UPLOADS_URL}/placeholder-image.jpg`;
                         }}
                       />
                     )}
