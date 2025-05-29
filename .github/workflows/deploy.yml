@@ -31,7 +31,7 @@ jobs:
     - name: Deploy to server
       run: |
         ssh root@159.223.118.251 << 'EOF'
-          # Navigate to app directory (using /root/stripe instead of /opt/myapp)
+          # Navigate to app directory
           cd /root
           
           # Stop existing containers first
@@ -49,11 +49,13 @@ jobs:
             cp default.conf nginx.conf
           fi
           
-          # Create server .env file with basic setup if it doesn't exist
-          if [ ! -f server/.env ]; then
-            echo "NODE_ENV=production" > server/.env
-            echo "PORT=5000" >> server/.env
-          fi
+          # Create server .env file with Stripe configuration
+          cat > server/.env << EOL
+NODE_ENV=production
+PORT=5000
+STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
+STRIPE_PUBLISHABLE_KEY=${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+EOL
           
           # Clean up Docker to free space
           docker system prune -f
@@ -85,15 +87,15 @@ jobs:
         echo "Testing main endpoint..."
         curl -f http://159.223.118.251 && echo "✅ Main site works" || echo "❌ Main site failed"
         
-        echo "Testing API endpoint..."
-        curl -f http://159.223.118.251/api/ && echo "✅ API works" || echo "⚠️ API might not have root endpoint"
+        echo "Testing API health endpoint..."
+        curl -f http://159.223.118.251/api/health && echo "✅ API health works" || echo "⚠️ API health endpoint not available"
         
         # Check individual services
         echo "Testing frontend directly..."
         curl -f http://159.223.118.251:3000 && echo "✅ Frontend works" || echo "❌ Frontend failed"
         
-        echo "Testing backend directly..."
-        curl -f http://159.223.118.251:5000 && echo "✅ Backend works" || echo "❌ Backend failed"
+        echo "Testing backend health directly..."
+        curl -f http://159.223.118.251:5000/health && echo "✅ Backend works" || echo "❌ Backend failed"
         
     - name: Deployment summary
       if: always()

@@ -113,10 +113,10 @@ app.post('/create-checkout-session', async (req, res) => {
       line_items,
       mode: 'payment',
       success_url: process.env.NODE_ENV === 'production' 
-        ? 'http://178.128.155.240/success'
+        ? 'http://http://159.223.118.251/success'
         : 'http://localhost:3000/success',
       cancel_url: process.env.NODE_ENV === 'production'
-        ? 'http://178.128.155.240/cancel'
+        ? 'http://http://159.223.118.251/cancel'
         : 'http://localhost:3000/cancel',
     });
 
