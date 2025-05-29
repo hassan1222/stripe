@@ -125,7 +125,7 @@ const Header = () => {
                             <div className="flex-shrink-0 w-12 h-12 bg-gray-100 rounded overflow-hidden">
                               {item.imageUrl && (
                                 <img 
-                                  src={`http://localhost:5000/uploads/${item.imageUrl.split('\\').pop().split('/').pop()}`}
+                                  src={`http://159.223.118.251:5000/uploads/${item.imageUrl.split('\\').pop().split('/').pop()}`}
                                   alt={item.title}
                                   className="w-full h-full object-cover"
                                   onError={(e) => {

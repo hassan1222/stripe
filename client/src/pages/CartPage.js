@@ -33,7 +33,7 @@ const CartPage = () => {
       setIsLoading(true);
       const stripe = await loadStripe('pk_test_51ROPv12arKXlXqJ8hHB2DiKoAGAXsPTbwaUT4s2edCtrCOIMtJ6RrA3eLHSiQlIeuMrXSMSeNR4L9YEgc6oVNZiW009rUEk60d');
     
-      const response = await fetch('http://localhost:5000/create-checkout-session', {
+      const response = await fetch('http://159.223.118.251:5000/create-checkout-session', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -114,7 +114,7 @@ const CartPage = () => {
                   <div className="flex-shrink-0 w-full sm:w-20 h-20 mb-4 sm:mb-0 bg-gray-100 rounded overflow-hidden">
                     {item.imageUrl && (
                       <img 
-                        src={`http://localhost:5000/uploads/${item.imageUrl.split('\\').pop().split('/').pop()}`}
+                        src={`http://159.223.118.251:5000/uploads/${item.imageUrl.split('\\').pop().split('/').pop()}`}
                         alt={item.title}
                         className="w-full h-full object-cover"
                         onError={(e) => {
