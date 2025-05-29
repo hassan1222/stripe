@@ -31,7 +31,7 @@ jobs:
     - name: Deploy to server
       run: |
         ssh root@159.223.118.251 << 'EOF'
-          # Navigate to app directory (using /root/stripe instead of /opt/myapp)
+          # Navigate to app directory
           cd /root
           
           # Stop existing containers first
@@ -49,11 +49,26 @@ jobs:
             cp default.conf nginx.conf
           fi
           
-          # Create server .env file with basic setup if it doesn't exist
-          if [ ! -f server/.env ]; then
-            echo "NODE_ENV=production" > server/.env
-            echo "PORT=5000" >> server/.env
-          fi
+          # Create server .env file with all required environment variables
+          cat > server/.env << 'ENVEOF'
+NODE_ENV=production
+PORT=5000
+MONGODB_URI=${{ secrets.MONGODB_URI }}
+JWT_SECRET=${{ secrets.JWT_SECRET }}
+STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
+SESSION_SECRET=${{ secrets.SESSION_SECRET }}
+GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+UPLOAD_DIR=uploads/
+ENVEOF
+          
+          # Create client .env file
+          cat > client/.env << 'CLIENTEOF'
+REACT_APP_API_URL=http://159.223.118.251:5000/api/auth
+REACT_APP_PRODUCTS_API_URL=http://159.223.118.251:5000/api/products
+REACT_APP_UPLOADS_URL=http://159.223.118.251:5000/uploads
+REACT_APP_STRIPE_PUBLISHABLE_KEY=pk_test_51ROPv12arKXlXqJ8hHB2DiKoAGAXsPTbwaUT4s2edCtrCOIMtJ6RrA3eLHSiQlIeuMrXSMSeNR4L9YEgc6oVNZiW009rUEk60d
+CLIENTEOF
           
           # Clean up Docker to free space
           docker system prune -f
