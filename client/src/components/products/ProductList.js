@@ -114,6 +114,7 @@ const ProductList = () => {
                     e.target.src = `${UPLOADS_URL}/placeholder-image.jpg`;
                   }}
                 />
+                
               </div>
               <div className="p-6">
                 <div className="flex justify-between items-center mb-2">
