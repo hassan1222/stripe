@@ -34,16 +34,28 @@ const CartPage = () => {
       setIsLoading(true);
       const stripe = await loadStripe('pk_test_51ROPv12arKXlXqJ8hHB2DiKoAGAXsPTbwaUT4s2edCtrCOIMtJ6RrA3eLHSiQlIeuMrXSMSeNR4L9YEgc6oVNZiW009rUEk60d');
     
+      // Validate cart items before sending
+      if (!cartItems || cartItems.length === 0) {
+        throw new Error('Cart is empty');
+      }
+
       const response = await fetch('http://159.223.118.251:5000/create-checkout-session', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ cartItems }),
+        body: JSON.stringify({ 
+          cartItems: cartItems.map(item => ({
+            title: item.title,
+            price: item.price,
+            quantity: item.quantity
+          }))
+        }),
       });
     
       if (!response.ok) {
-        throw new Error('Network response was not ok');
+        const errorData = await response.json();
+        throw new Error(errorData.details || errorData.error || 'Network response was not ok');
       }
       
       const session = await response.json();
@@ -54,11 +66,11 @@ const CartPage = () => {
     
       if (result.error) {
         console.error('Stripe redirect error:', result.error);
-        alert(result.error.message);
+        throw new Error(result.error.message);
       }
     } catch (error) {
       console.error('Checkout error:', error);
-      alert('An error occurred during checkout. Please try again.');
+      alert(error.message || 'An error occurred during checkout. Please try again.');
     } finally {
       setIsLoading(false);
     }

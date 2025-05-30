@@ -96,33 +96,46 @@ app.post('/create-checkout-session', async (req, res) => {
   const { cartItems } = req.body;
 
   try {
-    const line_items = cartItems.map(item => ({
-      price_data: {
-        currency: 'usd',
-        product_data: {
-          name: item.title,
+    // Validate cart items
+    if (!cartItems || !Array.isArray(cartItems) || cartItems.length === 0) {
+      return res.status(400).json({ error: 'Invalid cart items' });
+    }
+
+    const line_items = cartItems.map(item => {
+      if (!item.title || !item.price || !item.quantity) {
+        throw new Error('Invalid item data');
+      }
+      return {
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: item.title,
+          },
+          unit_amount: Math.round(item.price * 100), // convert to cents
         },
-        unit_amount: Math.round(item.price * 100), // convert to cents
-      },
-      quantity: item.quantity,
-    }));
+        quantity: item.quantity,
+      };
+    });
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items,
       mode: 'payment',
       success_url: process.env.NODE_ENV === 'production' 
-        ? 'http://http://159.223.118.251/success'
+        ? 'http://159.223.118.251:3000/success'
         : 'http://localhost:3000/success',
       cancel_url: process.env.NODE_ENV === 'production'
-        ? 'http://http://159.223.118.251/cancel'
+        ? 'http://159.223.118.251:3000/cancel'
         : 'http://localhost:3000/cancel',
     });
 
     res.json({ id: session.id });
   } catch (error) {
-    console.error('Error creating Stripe session:', error.message);
-    res.status(500).json({ error: error.message });
+    console.error('Error creating Stripe session:', error);
+    res.status(500).json({ 
+      error: 'Failed to create checkout session',
+      details: error.message 
+    });
   }
 });
 
